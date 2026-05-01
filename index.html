@@ -6,72 +6,108 @@
     <title>科学部 予定管理</title>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
-        body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; }
-        #calendar { max-width: 900px; margin: 20px auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; font-size: 1.5rem; }
-        /* タブレットでも操作しやすいように少し大きめに */
-        .fc-event { cursor: pointer; padding: 2px 5px; }
+        body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; }
+        #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* 入力フォームのスタイル */
+        .form-container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .form-container h2 { margin-top: 0; font-size: 1.2rem; }
+        input[type="text"], input[type="date"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box; /* iPhoneでの幅ズレ防止 */
+            font-size: 16px; /* iPhoneでズームされないためのサイズ */
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:active { background-color: #0056b3; }
+        
+        h1 { text-align: center; font-size: 1.5rem; }
     </style>
 </head>
 <body>
 
-    <h1>🧪 科学部 予定・タスク管理</h1>
+    <h1>🧪 科学部 予定管理</h1>
+
     <div id='calendar'></div>
+
+    <!-- iPhoneでも使いやすい入力フォーム -->
+    <div class="form-container">
+        <h2>📅 予定を追加する</h2>
+        <input type="text" id="eventTitle" placeholder="予定の名前（例：実験A）">
+        <input type="date" id="eventDate">
+        <button id="addBtn">カレンダーに追加</button>
+    </div>
 
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
+        var eventTitleInput = document.getElementById('eventTitle');
+        var eventDateInput = document.getElementById('eventDate');
+        var addBtn = document.getElementById('addBtn');
 
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'dayGridMonth',
           locale: 'ja',
           headerToolbar: {
-            left: 'prev,next today',
+            left: 'prev,next',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek'
+            right: 'today'
           },
-          editable: true, // ドラッグ＆ドロップを許可
-          selectable: true, // 日付選択を許可
-
-          // --- 1. 予定の追加 ---
-          select: function(info) {
-            var title = prompt('予定のタイトルを入力してください:');
-            if (title) {
-              var newEvent = {
-                title: title,
-                start: info.startStr,
-                end: info.endStr,
-                allDay: info.allDay
-              };
-              calendar.addEvent(newEvent);
-              saveEvents(); // 保存
-            }
-            calendar.unselect();
-          },
-
-          // --- 2. 予定の削除 ---
+          events: JSON.parse(localStorage.getItem('clubEvents')) || [],
           eventClick: function(info) {
-            if (confirm('この予定「' + info.event.title + '」を削除しますか？')) {
+            if (confirm('「' + info.event.title + '」を削除しますか？')) {
               info.event.remove();
-              saveEvents(); // 保存
+              saveEvents();
             }
-          },
-
-          // --- 3. データの読み込み ---
-          events: JSON.parse(localStorage.getItem('clubEvents')) || []
+          }
         });
 
         calendar.render();
 
-        // --- 4. データをブラウザに保存する関数 ---
+        // ボタンを押した時の処理
+        addBtn.addEventListener('click', function() {
+          var title = eventTitleInput.value;
+          var date = eventDateInput.value;
+
+          if (title && date) {
+            calendar.addEvent({
+              title: title,
+              start: date,
+              allDay: true
+            });
+            saveEvents();
+            
+            // 入力欄を空にする
+            eventTitleInput.value = '';
+            eventDateInput.value = '';
+            alert('追加しました！');
+          } else {
+            alert('タイトルと日付を入力してください');
+          }
+        });
+
         function saveEvents() {
           var events = calendar.getEvents().map(function(e) {
-            return {
-              title: e.title,
-              start: e.startStr,
-              end: e.endStr,
-              allDay: e.allDay
-            };
+            return { title: e.title, start: e.startStr, allDay: e.allDay };
           });
           localStorage.setItem('clubEvents', JSON.stringify(events));
         }
