@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset='utf-8' />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>科学部 予定管理アプリ</title>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f7f6; }
+        #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <h1>科学部 予定・タスク管理</h1>
+    <div id='calendar'></div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek' // 月表示と週表示の切り替え
+          },
+          locale: 'ja', // 日本語化
+          // ここに予定を追加していきます
+          events: [
+            { title: '部会', start: '2026-05-01' },
+            { title: '実験準備', start: '2026-05-02', end: '2026-05-04' }
+          ],
+          // 日付をクリックした時の動作（将来的にタスク追加などに使えます）
+          dateClick: function(info) {
+            alert('日付がクリックされました: ' + info.dateStr);
+          }
+        });
+        calendar.render();
+      });
+    </script>
+</body>
+</html>
