@@ -10,7 +10,6 @@
         body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; padding-bottom: 220px; }
         #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 400px; }
         
-        /* 入力フォームのスタイル */
         .form-container {
             max-width: 900px;
             margin: 20px auto;
@@ -44,7 +43,7 @@
         
         h1 { text-align: center; font-size: 1.5rem; }
 
-        /* iPadデバッグ用パネルのスタイル */
+        /* デバッグパネル */
         #debugPanel {
             position: fixed;
             bottom: 0;
@@ -98,7 +97,6 @@
 
     <div id='calendar'></div>
 
-    <!-- 入力フォーム -->
     <div class="form-container">
         <h2>📅 予定を追加する</h2>
         <input type="text" id="eventTitle" placeholder="予定の名前（例：実験A）">
@@ -106,10 +104,9 @@
         <button id="addBtn">カレンダーに追加</button>
     </div>
 
-    <!-- 🛠️ デバッグ用パネル -->
     <div id="debugPanel">
         <div id="debugHeader">
-            <span>🛠️ 画面上デバッグコンソール (GAS経由)</span>
+            <span>🛠️ 画面上デバッグコンソール (GASプロキシ版)</span>
             <div>
                 <button class="debug-btn" id="pingBtn">接続テスト</button>
                 <button class="debug-btn" id="clearDebugBtn">ログ消去</button>
@@ -157,7 +154,7 @@
       document.getElementById('pingBtn').addEventListener('click', async () => {
         console.log('GASへ通信テスト中...');
         try {
-          const res = await fetch(`${GAS_WEB_APP_URL}?action=ping`);
+          const res = await fetch(`${GAS_WEB_APP_URL}?action=ping`, { redirect: 'follow' });
           const data = await res.json();
           console.log('通信成功！ GASプロキシ経由で正常接続されています:', JSON.stringify(data));
         } catch (e) {
@@ -185,7 +182,9 @@
           events: async function(fetchInfo, successCallback, failureCallback) {
             console.log('GAS経由でデータ読み込み中...');
             try {
-              const res = await fetch(GAS_WEB_APP_URL);
+              const res = await fetch(GAS_WEB_APP_URL, { redirect: 'follow' });
+              if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+              
               const data = await res.json();
 
               if (!Array.isArray(data)) {
@@ -213,7 +212,9 @@
               try {
                 const res = await fetch(GAS_WEB_APP_URL, {
                   method: 'POST',
-                  body: JSON.stringify({ action: 'delete', id: info.event.id })
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify({ action: 'delete', id: info.event.id }),
+                  redirect: 'follow'
                 });
                 const result = await res.json();
 
@@ -242,10 +243,12 @@
             try {
               const res = await fetch(GAS_WEB_APP_URL, {
                 method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({
                   action: 'insert',
                   data: [{ title: title, start: date, all_day: true }]
-                })
+                }),
+                redirect: 'follow'
               });
               const data = await res.json();
 
