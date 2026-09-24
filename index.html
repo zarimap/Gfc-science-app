@@ -3,11 +3,9 @@
 <head>
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>科学部 予定管理</title>
+    <title>科学部 予定管理 (GASプロキシ版)</title>
     <!-- FullCalendar v6 -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
-    <!-- Supabase JS Client v2 -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; padding-bottom: 220px; }
         #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 400px; }
@@ -29,8 +27,8 @@
             margin: 10px 0;
             border: 1px solid #ccc;
             border-radius: 6px;
-            box-sizing: border-box; /* iPad/iPhoneでの幅ズレ防止 */
-            font-size: 16px; /* ズーム防止 */
+            box-sizing: border-box;
+            font-size: 16px;
         }
         button {
             width: 100%;
@@ -108,10 +106,10 @@
         <button id="addBtn">カレンダーに追加</button>
     </div>
 
-    <!-- 🛠️ iPadデバッグ用パネル -->
+    <!-- 🛠️ デバッグ用パネル -->
     <div id="debugPanel">
         <div id="debugHeader">
-            <span>🛠️ 画面上デバッグコンソール (iPad対応)</span>
+            <span>🛠️ 画面上デバッグコンソール (GAS経由)</span>
             <div>
                 <button class="debug-btn" id="pingBtn">接続テスト</button>
                 <button class="debug-btn" id="clearDebugBtn">ログ消去</button>
@@ -122,7 +120,7 @@
 
     <script>
       // ==========================================
-      // 1. 簡易デバッグロガー（iPadでログを見るため）
+      // 1. 簡易デバッグロガー
       // ==========================================
       const debugLogs = document.getElementById('debugLogs');
       function logToPanel(msg, type = 'info') {
@@ -151,43 +149,19 @@
       });
 
       // ==========================================
-      // 2. Supabase 設定
+      // 2. GAS Webアプリ URL 設定
       // ==========================================
-      const SUPABASE_URL = 'https://cbigswowbtfvnlrawkwq.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiaWdzd293YnRmdm5scmF3a3dxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxOTM5MjksImV4cCI6MjEwNTc2OTkyOX0.2fQO88HlaO74DUngOOn9WN8ep6glEoEW0L6YkfklgQk';
-
-      let supabaseClient = null;
-
-      try {
-        if (window.supabase) {
-          // iPad Safariのキャッシュ不具合対策を追加して初期化
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: { persistSession: false },
-            global: {
-              headers: { 'Cache-Control': 'no-cache' },
-              fetch: (url, options) => fetch(url, { ...options, cache: 'no-store' })
-            }
-          });
-          console.log('Supabase クライアント初期化完了');
-        } else {
-          console.warn('Supabaseライブラリの読み込みに失敗しました。');
-        }
-      } catch (e) {
-        console.error('Supabase初期化失敗: ' + e.message);
-      }
+      const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxeICmbAAbI_QfH4GfTOXAPEoDNyBbVI8i2WkLjP-Zm2iSMjoR1dgGlmhQb78djL3TL0Q/exec';
 
       // 接続テストボタン
       document.getElementById('pingBtn').addEventListener('click', async () => {
-        if (!supabaseClient) {
-          console.error('接続失敗: Supabaseクライアントが生成されていません');
-          return;
-        }
-        console.log('Supabaseへ通信テスト中...');
-        const { data, error } = await supabaseClient.from('events').select('count', { count: 'exact', head: true });
-        if (error) {
-          console.error('通信エラー: ' + error.message);
-        } else {
-          console.log('通信成功！ Supabaseに正常接続されています。');
+        console.log('GASへ通信テスト中...');
+        try {
+          const res = await fetch(`${GAS_WEB_APP_URL}?action=ping`);
+          const data = await res.json();
+          console.log('通信成功！ GASプロキシ経由で正常接続されています:', JSON.stringify(data));
+        } catch (e) {
+          console.error('GAS接続エラー: ' + e.message);
         }
       });
 
@@ -208,24 +182,42 @@
             center: 'title',
             right: 'today'
           },
-          events: fetchEventsFromSupabase,
-          eventClick: async function(info) {
-            if (!supabaseClient) {
-              alert('Supabaseが未設定です');
-              return;
-            }
+          events: async function(fetchInfo, successCallback, failureCallback) {
+            console.log('GAS経由でデータ読み込み中...');
+            try {
+              const res = await fetch(GAS_WEB_APP_URL);
+              const data = await res.json();
 
+              if (!Array.isArray(data)) {
+                throw new Error(data.message || data.error || '取得データ形式が不正です');
+              }
+
+              console.log(`${data.length} 件のデータを受信しました`);
+              const events = data.map(event => ({
+                id: event.id,
+                title: event.title,
+                start: event.start,
+                allDay: event.all_day
+              }));
+
+              successCallback(events);
+            } catch (err) {
+              console.error('取得エラー: ' + err.message);
+              successCallback([]);
+            }
+          },
+          eventClick: async function(info) {
             if (confirm('「' + info.event.title + '」を削除しますか？')) {
-              const eventId = info.event.id;
-              console.log(`削除処理を開始... (ID: ${eventId})`);
+              console.log(`GAS経由で削除処理を開始... (ID: ${info.event.id})`);
 
               try {
-                const { error } = await supabaseClient
-                  .from('events')
-                  .delete()
-                  .eq('id', eventId);
+                const res = await fetch(GAS_WEB_APP_URL, {
+                  method: 'POST',
+                  body: JSON.stringify({ action: 'delete', id: info.event.id })
+                });
+                const result = await res.json();
 
-                if (error) throw error;
+                if (result.error) throw new Error(result.error);
 
                 info.event.remove();
                 console.log(`削除成功: ${info.event.title}`);
@@ -241,58 +233,25 @@
         calendar.render();
         console.log('FullCalendar 描画完了');
 
-        async function fetchEventsFromSupabase(fetchInfo, successCallback, failureCallback) {
-          if (!supabaseClient) {
-            console.warn('Supabase未接続のためイベントを取得しません');
-            successCallback([]);
-            return;
-          }
-
-          console.log('データ読み込み中...');
-          try {
-            const { data, error } = await supabaseClient
-              .from('events')
-              .select('*');
-
-            if (error) throw error;
-
-            console.log(`${data.length} 件のデータを受信しました`);
-            const events = data.map(event => ({
-              id: event.id,
-              title: event.title,
-              start: event.start,
-              allDay: event.all_day
-            }));
-
-            successCallback(events);
-          } catch (err) {
-            console.error('取得エラー: ' + err.message);
-            successCallback([]);
-          }
-        }
-
         addBtn.addEventListener('click', async function() {
-          if (!supabaseClient) {
-            alert('Supabaseのキーを設定してください');
-            return;
-          }
-
           var title = eventTitleInput.value;
           var date = eventDateInput.value;
 
           if (title && date) {
-            console.log(`データ追加中: "${title}" (${date})`);
+            console.log(`GAS経由でデータ追加中: "${title}" (${date})`);
             try {
-              const { data, error } = await supabaseClient
-                .from('events')
-                .insert([
-                  { title: title, start: date, all_day: true }
-                ])
-                .select();
+              const res = await fetch(GAS_WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                  action: 'insert',
+                  data: [{ title: title, start: date, all_day: true }]
+                })
+              });
+              const data = await res.json();
 
-              if (error) throw error;
+              if (data.error) throw new Error(data.error);
 
-              if (data && data.length > 0) {
+              if (Array.isArray(data) && data.length > 0) {
                 calendar.addEvent({
                   id: data[0].id,
                   title: data[0].title,
