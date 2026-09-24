@@ -7,49 +7,32 @@
     <!-- FullCalendar v6 -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            background-color: #f0f2f5;
-            color: #333;
-            font-family: sans-serif;
+        body { 
+            font-family: sans-serif; 
+            margin: 10px; 
+            background-color: #f0f2f5; 
+            color: #333; 
         }
-        
-        body {
-            padding: 10px 10px 40px 10px; /* 下部余白を適正値に */
-        }
-
-        h1 { 
-            text-align: center; 
-            font-size: 1.5rem; 
-            margin: 10px 0 20px 0;
-        }
-
         #calendar { 
             max-width: 900px; 
             margin: 0 auto; 
             background: white; 
-            padding: 15px; 
+            padding: 10px; 
             border-radius: 12px; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
-            box-sizing: border-box;
+            min-height: 400px; 
         }
         
         .form-container {
             max-width: 900px;
-            margin: 20px auto 0 auto; /* 下マージンをリセット */
+            margin: 20px auto;
             background: #fff;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             box-sizing: border-box;
         }
-
-        .form-container h2 { 
-            margin-top: 0; 
-            font-size: 1.2rem; 
-        }
-
+        .form-container h2 { margin-top: 0; font-size: 1.2rem; }
         input[type="text"], input[type="date"] {
             width: 100%;
             padding: 10px;
@@ -59,7 +42,6 @@
             box-sizing: border-box;
             font-size: 16px;
         }
-
         button {
             width: 100%;
             padding: 12px;
@@ -70,10 +52,9 @@
             font-size: 16px;
             cursor: pointer;
         }
-
-        button:active { 
-            background-color: #0056b3; 
-        }
+        button:active { background-color: #0056b3; }
+        
+        h1 { text-align: center; font-size: 1.5rem; }
     </style>
 </head>
 <body>
@@ -131,7 +112,6 @@
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'dayGridMonth',
           locale: 'ja',
-          height: 'auto', // ★ Chromeの不自然な高さ計算・スクロール余白を防止
           headerToolbar: {
             left: 'prev,next',
             center: 'title',
