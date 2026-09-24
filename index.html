@@ -54,12 +54,99 @@
         }
         button:active { background-color: #0056b3; }
         
-        h1 { text-align: center; font-size: 1.5rem; }
+        /* ヘッダーエリアのスタイル */
+        .header-container {
+            max-width: 900px;
+            margin: 0 auto 10px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 { 
+            margin: 0; 
+            font-size: 1.5rem; 
+        }
+        .help-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            width: auto;
+        }
+        .help-btn:hover {
+            background-color: #5a6268;
+        }
+
+        /* 使い方モーダル（画面中央表示）のスタイル */
+        .modal-overlay {
+            display: none; /* 初期状態は非表示 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: relative;
+            box-sizing: border-box;
+            animation: modalFadeIn 0.2s ease-out;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+            width: auto;
+            padding: 0;
+            line-height: 1;
+        }
+        .modal-close-btn:hover {
+            color: #333;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+        .modal-content ul {
+            padding-left: 20px;
+            line-height: 1.6;
+        }
+        .modal-content li {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
 
-    <h1>🧪 科学部 予定管理</h1>
+    <!-- ヘッダーエリア -->
+    <div class="header-container">
+        <h1>🧪 科学部 予定管理</h1>
+        <button class="help-btn" id="openHelpBtn">❓ 使い方</button>
+    </div>
 
     <div id='calendar'></div>
 
@@ -68,6 +155,19 @@
         <input type="text" id="eventTitle" placeholder="予定の名前（例：実験A）">
         <input type="date" id="eventDate">
         <button id="addBtn">カレンダーに追加</button>
+    </div>
+
+    <!-- 使い方モーダル -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="closeHelpBtn">&times;</button>
+            <h3>📖 予定管理の使い方</h3>
+            <ul>
+                <li><strong>予定の確認:</strong> カレンダー上で科学部の予定を確認できます。</li>
+                <li><strong>予定の追加:</strong> カレンダー下のフォームに「予定の名前」と「日付」を入力し、「カレンダーに追加」を押します。</li>
+                <li><strong>予定の削除:</strong> カレンダー上の予定をクリック（タップ）すると削除できます。</li>
+            </ul>
+        </div>
     </div>
 
     <script>
@@ -101,9 +201,33 @@
       }
 
       // ==========================================
-      // 2. カレンダー & CRUD処理
+      // 2. モーダル表示制御
       // ==========================================
       document.addEventListener('DOMContentLoaded', function() {
+        const openHelpBtn = document.getElementById('openHelpBtn');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const helpModal = document.getElementById('helpModal');
+
+        // 「使い方」ボタンを押したら表示
+        openHelpBtn.addEventListener('click', function() {
+          helpModal.style.display = 'flex';
+        });
+
+        // ✕ボタンを押したら閉じる
+        closeHelpBtn.addEventListener('click', function() {
+          helpModal.style.display = 'none';
+        });
+
+        // 背景の黒い部分をクリックしても閉じる
+        helpModal.addEventListener('click', function(e) {
+          if (e.target === helpModal) {
+            helpModal.style.display = 'none';
+          }
+        });
+
+        // ==========================================
+        // 3. カレンダー & CRUD処理
+        // ==========================================
         var calendarEl = document.getElementById('calendar');
         var eventTitleInput = document.getElementById('eventTitle');
         var eventDateInput = document.getElementById('eventDate');
