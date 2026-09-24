@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>科学部 予定管理</title>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <!-- Supabase JS Client (v2) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; }
         #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
-        /* 入力フォームのスタイル */
         .form-container {
             max-width: 900px;
             margin: 20px auto;
@@ -25,8 +26,8 @@
             margin: 10px 0;
             border: 1px solid #ccc;
             border-radius: 6px;
-            box-sizing: border-box; /* iPhoneでの幅ズレ防止 */
-            font-size: 16px; /* iPhoneでズームされないためのサイズ */
+            box-sizing: border-box;
+            font-size: 16px;
         }
         button {
             width: 100%;
@@ -49,7 +50,6 @@
 
     <div id='calendar'></div>
 
-    <!-- iPhoneでも使いやすい入力フォーム -->
     <div class="form-container">
         <h2>📅 予定を追加する</h2>
         <input type="text" id="eventTitle" placeholder="予定の名前（例：実験A）">
@@ -58,12 +58,18 @@
     </div>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
+      // 1. Supabaseの初期化 (ご自身のプロジェクト情報に置き換えてください)
+      const SUPABASE_URL = 'https://cbigswowbtfvnlrawkwq.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiaWdzd293YnRmdm5scmF3a3dxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxOTM5MjksImV4cCI6MjEwNTc2OTkyOX0';
+      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      document.addEventListener('DOMContentLoaded', async function() {
         var calendarEl = document.getElementById('calendar');
         var eventTitleInput = document.getElementById('eventTitle');
         var eventDateInput = document.getElementById('eventDate');
         var addBtn = document.getElementById('addBtn');
 
+        // 2. カレンダーの初期化
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'dayGridMonth',
           locale: 'ja',
@@ -72,45 +78,87 @@
             center: 'title',
             right: 'today'
           },
-          events: JSON.parse(localStorage.getItem('clubEvents')) || [],
-          eventClick: function(info) {
+          events: fetchEventsFromSupabase, // 初回表示時にSupabaseから取得
+          eventClick: async function(info) {
             if (confirm('「' + info.event.title + '」を削除しますか？')) {
-              info.event.remove();
-              saveEvents();
+              // Supabaseから該当レコードを削除 (id指定)
+              const eventId = info.event.id;
+              const { error } = await supabase
+                .from('events')
+                .delete()
+                .eq('id', eventId);
+
+              if (error) {
+                console.error('削除失敗:', error);
+                alert('削除に失敗しました');
+              } else {
+                info.event.remove(); // UIから削除
+                alert('削除しました！');
+              }
             }
           }
         });
 
         calendar.render();
 
-        // ボタンを押した時の処理
-        addBtn.addEventListener('click', function() {
+        // 3. Supabaseからイベントデータ一覧を取得する関数
+        async function fetchEventsFromSupabase(fetchInfo, successCallback, failureCallback) {
+          const { data, error } = await supabase
+            .from('events')
+            .select('*');
+
+          if (error) {
+            console.error('データ取得失敗:', error);
+            failureCallback(error);
+            return;
+          }
+
+          // FullCalendarが認識できるオブジェクト形式に変換
+          const events = data.map(event => ({
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            allDay: event.all_day
+          }));
+
+          successCallback(events);
+        }
+
+        // 4. イベント追加処理
+        addBtn.addEventListener('click', async function() {
           var title = eventTitleInput.value;
           var date = eventDateInput.value;
 
           if (title && date) {
-            calendar.addEvent({
-              title: title,
-              start: date,
-              allDay: true
-            });
-            saveEvents();
-            
-            // 入力欄を空にする
-            eventTitleInput.value = '';
-            eventDateInput.value = '';
-            alert('追加しました！');
+            // Supabaseへインサート
+            const { data, error } = await supabase
+              .from('events')
+              .insert([
+                { title: title, start: date, all_day: true }
+              ])
+              .select(); // 追加したレコード情報（自動採番されたidなど）を受け取る
+
+            if (error) {
+              console.error('追加失敗:', error);
+              alert('追加に失敗しました');
+            } else if (data && data.length > 0) {
+              // 画面のカレンダーにも追加
+              calendar.addEvent({
+                id: data[0].id,
+                title: data[0].title,
+                start: data[0].start,
+                allDay: data[0].all_day
+              });
+
+              // 入力欄を空にする
+              eventTitleInput.value = '';
+              eventDateInput.value = '';
+              alert('追加しました！');
+            }
           } else {
             alert('タイトルと日付を入力してください');
           }
         });
-
-        function saveEvents() {
-          var events = calendar.getEvents().map(function(e) {
-            return { title: e.title, start: e.startStr, allDay: e.allDay };
-          });
-          localStorage.setItem('clubEvents', JSON.stringify(events));
-        }
       });
     </script>
 </body>
