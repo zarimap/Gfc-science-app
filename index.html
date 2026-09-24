@@ -82,14 +82,14 @@
 
         /* 使い方モーダル（画面中央表示）のスタイル */
         .modal-overlay {
-            display: none; /* 初期状態は非表示 */
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
-            z-index: 9999;
+            z-index: 9998;
             justify-content: center;
             align-items: center;
         }
@@ -138,9 +138,50 @@
         .modal-content li {
             margin-bottom: 8px;
         }
+
+        /* 🔄 全面ローディングオーバーレイのスタイル */
+        .loading-overlay {
+            display: flex; /* 初期状態で表示 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 99999; /* 全ての要素の最前面に配置 */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            backdrop-filter: blur(2px);
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e0e0e0;
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
+
+    <!-- 🔄 ローディング画面（初期表示 ON） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Loading…</div>
+    </div>
 
     <!-- ヘッダーエリア -->
     <div class="header-container">
@@ -171,6 +212,21 @@
     </div>
 
     <script>
+      // ==========================================
+      // 0. ローディング制御関数
+      // ==========================================
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const loadingText = document.getElementById('loadingText');
+
+      function showLoading(msg = 'Loading…') {
+        loadingText.textContent = msg;
+        loadingOverlay.style.display = 'flex';
+      }
+
+      function hideLoading() {
+        loadingOverlay.style.display = 'none';
+      }
+
       // ==========================================
       // 1. GAS 通信ラッパー関数
       // ==========================================
@@ -208,17 +264,14 @@
         const closeHelpBtn = document.getElementById('closeHelpBtn');
         const helpModal = document.getElementById('helpModal');
 
-        // 「使い方」ボタンを押したら表示
         openHelpBtn.addEventListener('click', function() {
           helpModal.style.display = 'flex';
         });
 
-        // ✕ボタンを押したら閉じる
         closeHelpBtn.addEventListener('click', function() {
           helpModal.style.display = 'none';
         });
 
-        // 背景の黒い部分をクリックしても閉じる
         helpModal.addEventListener('click', function(e) {
           if (e.target === helpModal) {
             helpModal.style.display = 'none';
@@ -242,6 +295,8 @@
             right: 'today'
           },
           events: async function(fetchInfo, successCallback, failureCallback) {
+            // 初期データ読み込み時のローディング表示
+            showLoading('Loading…');
             try {
               const data = await callGasApi();
 
@@ -265,10 +320,15 @@
               console.error('取得エラー:', err.message);
               alert('予定の取得に失敗しました');
               successCallback([]);
+            } finally {
+              // 通信完了（成功・失敗問わず）でローディング解除
+              hideLoading();
             }
           },
           eventClick: async function(info) {
             if (confirm('「' + info.event.title + '」を削除しますか？')) {
+              // 削除中のローディング表示 & 操作無効化
+              showLoading('削除中…');
               try {
                 const result = await callGasApi({
                   method: 'POST',
@@ -282,6 +342,8 @@
               } catch (err) {
                 console.error('削除失敗:', err.message);
                 alert('削除に失敗しました');
+              } finally {
+                hideLoading();
               }
             }
           }
@@ -294,6 +356,8 @@
           var date = eventDateInput.value;
 
           if (title && date) {
+            // 追加中のローディング表示 & 操作無効化
+            showLoading('追加中…');
             try {
               const data = await callGasApi({
                 method: 'POST',
@@ -320,6 +384,8 @@
             } catch (err) {
               console.error('追加失敗:', err.message);
               alert('追加に失敗しました');
+            } finally {
+              hideLoading();
             }
           } else {
             alert('タイトルと日付を入力してください');
