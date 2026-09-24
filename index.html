@@ -7,8 +7,21 @@
     <!-- FullCalendar v6 -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
-        body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; padding-bottom: 220px; }
-        #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 400px; }
+        body { 
+            font-family: sans-serif; 
+            margin: 10px; 
+            background-color: #f0f2f5; 
+            color: #333; 
+        }
+        #calendar { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 10px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            min-height: 400px; 
+        }
         
         .form-container {
             max-width: 900px;
@@ -42,53 +55,6 @@
         button:active { background-color: #0056b3; }
         
         h1 { text-align: center; font-size: 1.5rem; }
-
-        /* デバッグパネル */
-        #debugPanel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 200px;
-            background-color: #1e1e1e;
-            color: #00ff66;
-            font-family: monospace;
-            font-size: 12px;
-            padding: 10px;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-        }
-        #debugHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #444;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-            color: #fff;
-            font-weight: bold;
-        }
-        #debugLogs {
-            flex-grow: 1;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        .debug-btn {
-            background: #444;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            width: auto;
-            margin-left: 5px;
-        }
-        .log-error { color: #ff5555; }
-        .log-warn  { color: #ffb86c; }
-        .log-info  { color: #8be9fd; }
     </style>
 </head>
 <body>
@@ -104,49 +70,9 @@
         <button id="addBtn">カレンダーに追加</button>
     </div>
 
-    <div id="debugPanel">
-        <div id="debugHeader">
-            <span>🛠️ デバッグコンソール</span>
-            <div>
-                <button class="debug-btn" id="pingBtn">接続テスト</button>
-                <button class="debug-btn" id="clearDebugBtn">ログ消去</button>
-            </div>
-        </div>
-        <div id="debugLogs"></div>
-    </div>
-
     <script>
       // ==========================================
-      // 1. デバッグロガー
-      // ==========================================
-      const debugLogs = document.getElementById('debugLogs');
-      function logToPanel(msg, type = 'info') {
-        const time = new Date().toLocaleTimeString();
-        const div = document.createElement('div');
-        div.className = 'log-' + type;
-        div.textContent = `[${time}] ${msg}`;
-        debugLogs.appendChild(div);
-        debugLogs.scrollTop = debugLogs.scrollHeight;
-      }
-
-      const origLog = console.log;
-      const origErr = console.error;
-      const origWarn = console.warn;
-
-      console.log = function(...args) { origLog.apply(console, args); logToPanel(args.join(' '), 'info'); };
-      console.warn = function(...args) { origWarn.apply(console, args); logToPanel(args.join(' '), 'warn'); };
-      console.error = function(...args) { origErr.apply(console, args); logToPanel(args.join(' '), 'error'); };
-
-      window.addEventListener('error', function(e) {
-        console.error(`JS Error: ${e.message} (${e.filename}:${e.lineno})`);
-      });
-
-      document.getElementById('clearDebugBtn').addEventListener('click', () => {
-        debugLogs.innerHTML = '';
-      });
-
-      // ==========================================
-      // 2. GAS 通信ラッパー関数
+      // 1. GAS 通信ラッパー関数
       // ==========================================
       const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxlFIYrp2JuigWirQ6aGd0SrDjrQOWcZ3KooV5esH-6DqQL-fAtk5tTwi387J6p_fQAQA/exec';
 
@@ -160,7 +86,6 @@
         };
 
         if (method === 'POST') {
-          // text/plain を指定することでプリフライト(OPTIONS)を回避
           fetchOptions.body = JSON.stringify(options.body || {});
           fetchOptions.headers = {
             'Content-Type': 'text/plain;charset=utf-8'
@@ -175,19 +100,8 @@
         return await response.json();
       }
 
-      // 接続テストボタン
-      document.getElementById('pingBtn').addEventListener('click', async () => {
-        console.log('新URLへ接続テスト中...');
-        try {
-          const data = await callGasApi({ url: `${GAS_WEB_APP_URL}?action=ping` });
-          console.log('接続成功！ レスポンス:', JSON.stringify(data));
-        } catch (e) {
-          console.error('接続失敗: ' + e.message);
-        }
-      });
-
       // ==========================================
-      // 3. カレンダー & CRUD処理
+      // 2. カレンダー & CRUD処理
       // ==========================================
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
@@ -204,7 +118,6 @@
             right: 'today'
           },
           events: async function(fetchInfo, successCallback, failureCallback) {
-            console.log('予定データを読み込み中...');
             try {
               const data = await callGasApi();
 
@@ -216,7 +129,6 @@
                 throw new Error('受領したデータが配列形式ではありません');
               }
 
-              console.log(`${data.length} 件の予定を取得しました`);
               const events = data.map(event => ({
                 id: event.id,
                 title: event.title,
@@ -226,14 +138,13 @@
 
               successCallback(events);
             } catch (err) {
-              console.error('取得エラー: ' + err.message);
+              console.error('取得エラー:', err.message);
+              alert('予定の取得に失敗しました');
               successCallback([]);
             }
           },
           eventClick: async function(info) {
             if (confirm('「' + info.event.title + '」を削除しますか？')) {
-              console.log(`削除処理を実行中... (ID: ${info.event.id})`);
-
               try {
                 const result = await callGasApi({
                   method: 'POST',
@@ -243,10 +154,9 @@
                 if (result.error) throw new Error(result.error);
 
                 info.event.remove();
-                console.log(`削除完了: ${info.event.title}`);
                 alert('削除しました！');
               } catch (err) {
-                console.error('削除失敗: ' + err.message);
+                console.error('削除失敗:', err.message);
                 alert('削除に失敗しました');
               }
             }
@@ -260,7 +170,6 @@
           var date = eventDateInput.value;
 
           if (title && date) {
-            console.log(`予定を追加中: "${title}" (${date})`);
             try {
               const data = await callGasApi({
                 method: 'POST',
@@ -282,11 +191,10 @@
 
                 eventTitleInput.value = '';
                 eventDateInput.value = '';
-                console.log('追加完了！');
                 alert('追加しました！');
               }
             } catch (err) {
-              console.error('追加失敗: ' + err.message);
+              console.error('追加失敗:', err.message);
               alert('追加に失敗しました');
             }
           } else {
