@@ -3,7 +3,7 @@
 <head>
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>科学部 予定管理 (GASプロキシ版)</title>
+    <title>科学部 予定管理</title>
     <!-- FullCalendar v6 -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
@@ -106,7 +106,7 @@
 
     <div id="debugPanel">
         <div id="debugHeader">
-            <span>🛠️ 画面上デバッグコンソール (GASプロキシ版)</span>
+            <span>🛠️ デバッグコンソール</span>
             <div>
                 <button class="debug-btn" id="pingBtn">接続テスト</button>
                 <button class="debug-btn" id="clearDebugBtn">ログ消去</button>
@@ -117,7 +117,7 @@
 
     <script>
       // ==========================================
-      // 1. 簡易デバッグロガー
+      // 1. デバッグロガー
       // ==========================================
       const debugLogs = document.getElementById('debugLogs');
       function logToPanel(msg, type = 'info') {
@@ -146,19 +146,43 @@
       });
 
       // ==========================================
-      // 2. GAS Webアプリ URL 設定
+      // 2. GAS 通信ラッパー関数
       // ==========================================
       const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxlFIYrp2JuigWirQ6aGd0SrDjrQOWcZ3KooV5esH-6DqQL-fAtk5tTwi387J6p_fQAQA/exec';
 
+      async function callGasApi(options = {}) {
+        const url = options.url || GAS_WEB_APP_URL;
+        const method = options.method || 'GET';
+        
+        let fetchOptions = {
+          method: method,
+          redirect: 'follow'
+        };
+
+        if (method === 'POST') {
+          // text/plain を指定することでプリフライト(OPTIONS)を回避
+          fetchOptions.body = JSON.stringify(options.body || {});
+          fetchOptions.headers = {
+            'Content-Type': 'text/plain;charset=utf-8'
+          };
+        }
+
+        const response = await fetch(url, fetchOptions);
+        if (!response.ok) {
+          throw new Error(`HTTP Error Status: ${response.status}`);
+        }
+        
+        return await response.json();
+      }
+
       // 接続テストボタン
       document.getElementById('pingBtn').addEventListener('click', async () => {
-        console.log('GASへ通信テスト中...');
+        console.log('新URLへ接続テスト中...');
         try {
-          const res = await fetch(`${GAS_WEB_APP_URL}?action=ping`, { redirect: 'follow' });
-          const data = await res.json();
-          console.log('通信成功！ GASプロキシ経由で正常接続されています:', JSON.stringify(data));
+          const data = await callGasApi({ url: `${GAS_WEB_APP_URL}?action=ping` });
+          console.log('接続成功！ レスポンス:', JSON.stringify(data));
         } catch (e) {
-          console.error('GAS接続エラー: ' + e.message);
+          console.error('接続失敗: ' + e.message);
         }
       });
 
@@ -180,18 +204,19 @@
             right: 'today'
           },
           events: async function(fetchInfo, successCallback, failureCallback) {
-            console.log('GAS経由でデータ読み込み中...');
+            console.log('予定データを読み込み中...');
             try {
-              const res = await fetch(GAS_WEB_APP_URL, { redirect: 'follow' });
-              if (!res.ok) throw new Error(`HTTP status ${res.status}`);
-              
-              const data = await res.json();
+              const data = await callGasApi();
 
-              if (!Array.isArray(data)) {
-                throw new Error(data.message || data.error || '取得データ形式が不正です');
+              if (data.error) {
+                throw new Error(data.error);
               }
 
-              console.log(`${data.length} 件のデータを受信しました`);
+              if (!Array.isArray(data)) {
+                throw new Error('受領したデータが配列形式ではありません');
+              }
+
+              console.log(`${data.length} 件の予定を取得しました`);
               const events = data.map(event => ({
                 id: event.id,
                 title: event.title,
@@ -207,21 +232,18 @@
           },
           eventClick: async function(info) {
             if (confirm('「' + info.event.title + '」を削除しますか？')) {
-              console.log(`GAS経由で削除処理を開始... (ID: ${info.event.id})`);
+              console.log(`削除処理を実行中... (ID: ${info.event.id})`);
 
               try {
-                const res = await fetch(GAS_WEB_APP_URL, {
+                const result = await callGasApi({
                   method: 'POST',
-                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                  body: JSON.stringify({ action: 'delete', id: info.event.id }),
-                  redirect: 'follow'
+                  body: { action: 'delete', id: info.event.id }
                 });
-                const result = await res.json();
 
                 if (result.error) throw new Error(result.error);
 
                 info.event.remove();
-                console.log(`削除成功: ${info.event.title}`);
+                console.log(`削除完了: ${info.event.title}`);
                 alert('削除しました！');
               } catch (err) {
                 console.error('削除失敗: ' + err.message);
@@ -232,25 +254,21 @@
         });
 
         calendar.render();
-        console.log('FullCalendar 描画完了');
 
         addBtn.addEventListener('click', async function() {
           var title = eventTitleInput.value;
           var date = eventDateInput.value;
 
           if (title && date) {
-            console.log(`GAS経由でデータ追加中: "${title}" (${date})`);
+            console.log(`予定を追加中: "${title}" (${date})`);
             try {
-              const res = await fetch(GAS_WEB_APP_URL, {
+              const data = await callGasApi({
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
+                body: {
                   action: 'insert',
                   data: [{ title: title, start: date, all_day: true }]
-                }),
-                redirect: 'follow'
+                }
               });
-              const data = await res.json();
 
               if (data.error) throw new Error(data.error);
 
@@ -264,7 +282,7 @@
 
                 eventTitleInput.value = '';
                 eventDateInput.value = '';
-                console.log('追加成功！');
+                console.log('追加完了！');
                 alert('追加しました！');
               }
             } catch (err) {
