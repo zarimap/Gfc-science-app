@@ -4,13 +4,15 @@
     <meta charset='utf-8' />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>科学部 予定管理</title>
+    <!-- FullCalendar v6 -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
-    <!-- Supabase JS Client (v2) -->
+    <!-- Supabase JS Client v2 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; }
-        #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { font-family: sans-serif; margin: 10px; background-color: #f0f2f5; color: #333; padding-bottom: 220px; }
+        #calendar { max-width: 900px; margin: 0 auto; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 400px; }
         
+        /* 入力フォームのスタイル */
         .form-container {
             max-width: 900px;
             margin: 20px auto;
@@ -18,6 +20,7 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-sizing: border-box;
         }
         .form-container h2 { margin-top: 0; font-size: 1.2rem; }
         input[type="text"], input[type="date"] {
@@ -26,8 +29,8 @@
             margin: 10px 0;
             border: 1px solid #ccc;
             border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 16px;
+            box-sizing: border-box; /* iPad/iPhoneでの幅ズレ防止 */
+            font-size: 16px; /* ズーム防止 */
         }
         button {
             width: 100%;
@@ -42,6 +45,53 @@
         button:active { background-color: #0056b3; }
         
         h1 { text-align: center; font-size: 1.5rem; }
+
+        /* iPadデバッグ用パネルのスタイル */
+        #debugPanel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background-color: #1e1e1e;
+            color: #00ff66;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+        }
+        #debugHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            color: #fff;
+            font-weight: bold;
+        }
+        #debugLogs {
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .debug-btn {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            width: auto;
+            margin-left: 5px;
+        }
+        .log-error { color: #ff5555; }
+        .log-warn  { color: #ffb86c; }
+        .log-info  { color: #8be9fd; }
     </style>
 </head>
 <body>
@@ -50,6 +100,7 @@
 
     <div id='calendar'></div>
 
+    <!-- 入力フォーム -->
     <div class="form-container">
         <h2>📅 予定を追加する</h2>
         <input type="text" id="eventTitle" placeholder="予定の名前（例：実験A）">
@@ -57,19 +108,93 @@
         <button id="addBtn">カレンダーに追加</button>
     </div>
 
-    <script>
-      // 1. Supabaseの初期化 (ご自身のプロジェクト情報に置き換えてください)
-      const SUPABASE_URL = 'https://cbigswowbtfvnlrawkwq.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiaWdzd293YnRmdm5scmF3a3dxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxOTM5MjksImV4cCI6MjEwNTc2OTkyOX0';
-      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    <!-- 🛠️ iPadデバッグ用パネル -->
+    <div id="debugPanel">
+        <div id="debugHeader">
+            <span>🛠️ 画面上デバッグコンソール (iPad対応)</span>
+            <div>
+                <button class="debug-btn" id="pingBtn">接続テスト</button>
+                <button class="debug-btn" id="clearDebugBtn">ログ消去</button>
+            </div>
+        </div>
+        <div id="debugLogs"></div>
+    </div>
 
-      document.addEventListener('DOMContentLoaded', async function() {
+    <script>
+      // ==========================================
+      // 1. 簡易デバッグロガー（iPadでログを見るため）
+      // ==========================================
+      const debugLogs = document.getElementById('debugLogs');
+      function logToPanel(msg, type = 'info') {
+        const time = new Date().toLocaleTimeString();
+        const div = document.createElement('div');
+        div.className = 'log-' + type;
+        div.textContent = `[${time}] ${msg}`;
+        debugLogs.appendChild(div);
+        debugLogs.scrollTop = debugLogs.scrollHeight;
+      }
+
+      // 標準のconsole.log/errorをオーバーライド
+      const origLog = console.log;
+      const origErr = console.error;
+      const origWarn = console.warn;
+
+      console.log = function(...args) { origLog.apply(console, args); logToPanel(args.join(' '), 'info'); };
+      console.warn = function(...args) { origWarn.apply(console, args); logToPanel(args.join(' '), 'warn'); };
+      console.error = function(...args) { origErr.apply(console, args); logToPanel(args.join(' '), 'error'); };
+
+      window.addEventListener('error', function(e) {
+        console.error(`JS Error: ${e.message} (${e.filename}:${e.lineno})`);
+      });
+
+      document.getElementById('clearDebugBtn').addEventListener('click', () => {
+        debugLogs.innerHTML = '';
+      });
+
+      // ==========================================
+      // 2. Supabase 設定
+      // ==========================================
+      // ⚠️ ご自身のSupabaseのURLとanon keyに書き換えてください
+      const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+      const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+      let supabaseClient = null;
+
+      try {
+        if (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          console.log('Supabase クライアント初期化完了');
+        } else {
+          console.warn('SupabaseのURLまたはKeyが設定されていません。');
+        }
+      } catch (e) {
+        console.error('Supabase初期化失敗: ' + e.message);
+      }
+
+      // 接続テストボタン
+      document.getElementById('pingBtn').addEventListener('click', async () => {
+        if (!supabaseClient) {
+          console.error('接続失敗: SUPABASE_URLとANON_KEYを設定してください');
+          return;
+        }
+        console.log('Supabaseへ通信テスト中...');
+        const { data, error } = await supabaseClient.from('events').select('count', { count: 'exact', head: true });
+        if (error) {
+          console.error('通信エラー: ' + error.message);
+        } else {
+          console.log('通信成功！ Supabaseに正常接続されています。');
+        }
+      });
+
+      // ==========================================
+      // 3. カレンダー & CRUD処理
+      // ==========================================
+      document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         var eventTitleInput = document.getElementById('eventTitle');
         var eventDateInput = document.getElementById('eventDate');
         var addBtn = document.getElementById('addBtn');
 
-        // 2. カレンダーの初期化
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'dayGridMonth',
           locale: 'ja',
@@ -78,82 +203,109 @@
             center: 'title',
             right: 'today'
           },
-          events: fetchEventsFromSupabase, // 初回表示時にSupabaseから取得
+          events: fetchEventsFromSupabase,
           eventClick: async function(info) {
-            if (confirm('「' + info.event.title + '」を削除しますか？')) {
-              // Supabaseから該当レコードを削除 (id指定)
-              const eventId = info.event.id;
-              const { error } = await supabase
-                .from('events')
-                .delete()
-                .eq('id', eventId);
+            if (!supabaseClient) {
+              alert('Supabaseが未設定です');
+              return;
+            }
 
-              if (error) {
-                console.error('削除失敗:', error);
-                alert('削除に失敗しました');
-              } else {
-                info.event.remove(); // UIから削除
+            if (confirm('「' + info.event.title + '」を削除しますか？')) {
+              const eventId = info.event.id;
+              console.log(`削除処理を開始... (ID: ${eventId})`);
+
+              try {
+                // DELETE処理
+                const { error } = await supabaseClient
+                  .from('events')
+                  .delete()
+                  .eq('id', eventId);
+
+                if (error) throw error;
+
+                info.event.remove();
+                console.log(`削除成功: ${info.event.title}`);
                 alert('削除しました！');
+              } catch (err) {
+                console.error('削除失敗: ' + err.message);
+                alert('削除に失敗しました');
               }
             }
           }
         });
 
         calendar.render();
+        console.log('FullCalendar 描画完了');
 
-        // 3. Supabaseからイベントデータ一覧を取得する関数
+        // Supabaseからのデータ取得
         async function fetchEventsFromSupabase(fetchInfo, successCallback, failureCallback) {
-          const { data, error } = await supabase
-            .from('events')
-            .select('*');
-
-          if (error) {
-            console.error('データ取得失敗:', error);
-            failureCallback(error);
+          if (!supabaseClient) {
+            console.warn('Supabase未接続のためイベントを取得しません');
+            successCallback([]);
             return;
           }
 
-          // FullCalendarが認識できるオブジェクト形式に変換
-          const events = data.map(event => ({
-            id: event.id,
-            title: event.title,
-            start: event.start,
-            allDay: event.all_day
-          }));
+          console.log('データ読み込み中...');
+          try {
+            const { data, error } = await supabaseClient
+              .from('events')
+              .select('*');
 
-          successCallback(events);
+            if (error) throw error;
+
+            console.log(`${data.length} 件のデータを受信しました`);
+            const events = data.map(event => ({
+              id: event.id,
+              title: event.title,
+              start: event.start,
+              allDay: event.all_day
+            }));
+
+            successCallback(events);
+          } catch (err) {
+            console.error('取得エラー: ' + err.message);
+            successCallback([]);
+          }
         }
 
-        // 4. イベント追加処理
+        // イベント追加
         addBtn.addEventListener('click', async function() {
+          if (!supabaseClient) {
+            alert('Supabaseのキーを設定してください');
+            return;
+          }
+
           var title = eventTitleInput.value;
           var date = eventDateInput.value;
 
           if (title && date) {
-            // Supabaseへインサート
-            const { data, error } = await supabase
-              .from('events')
-              .insert([
-                { title: title, start: date, all_day: true }
-              ])
-              .select(); // 追加したレコード情報（自動採番されたidなど）を受け取る
+            console.log(`データ追加中: "${title}" (${date})`);
+            try {
+              const { data, error } = await supabaseClient
+                .from('events')
+                .insert([
+                  { title: title, start: date, all_day: true }
+                ])
+                .select();
 
-            if (error) {
-              console.error('追加失敗:', error);
+              if (error) throw error;
+
+              if (data && data.length > 0) {
+                calendar.addEvent({
+                  id: data[0].id,
+                  title: data[0].title,
+                  start: data[0].start,
+                  allDay: data[0].all_day
+                });
+
+                eventTitleInput.value = '';
+                eventDateInput.value = '';
+                console.log('追加成功！');
+                alert('追加しました！');
+              }
+            } catch (err) {
+              console.error('追加失敗: ' + err.message);
               alert('追加に失敗しました');
-            } else if (data && data.length > 0) {
-              // 画面のカレンダーにも追加
-              calendar.addEvent({
-                id: data[0].id,
-                title: data[0].title,
-                start: data[0].start,
-                allDay: data[0].all_day
-              });
-
-              // 入力欄を空にする
-              eventTitleInput.value = '';
-              eventDateInput.value = '';
-              alert('追加しました！');
             }
           } else {
             alert('タイトルと日付を入力してください');
